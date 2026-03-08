@@ -2,10 +2,11 @@ import streamlit as st
 import pandas as pd
 from datetime import datetime
 
-st.set_page_config(page_title="Almacén Saludable Pro", layout="wide")
-st.title("🌿 Gestión de Almacén Saludable")
+# 1. Configuración de la página con el nombre de tu local
+st.set_page_config(page_title="STOCK VITALCER ROCA", layout="wide")
+st.title("🌿 STOCK VITALCER ROCA")
 
-# 1. Inicialización de la base de datos de productos
+# 2. Inicialización de la base de datos de productos (si no existe)
 if 'df_stock' not in st.session_state:
     data = {
         'Producto': ['Nueces Mariposa', 'Harina de Almendras', 'Chía', 'Aceite de Coco'],
@@ -16,18 +17,16 @@ if 'df_stock' not in st.session_state:
     }
     st.session_state.df_stock = pd.DataFrame(data)
 
-# 2. Inicialización del Historial de Movimientos
-if 'historial' not in st.session_state:
-    st.session_state.historial = pd.DataFrame(columns=['Fecha', 'Producto', 'Tipo', 'Cantidad', 'Medida'])
+# 3. Inicialización del Historial de Movimientos (si no existe)
+if 'historial_datos' not in st.session_state:
+    st.session_state.historial_datos = []
 
 # --- Pestañas de la App ---
-tab1, tab2, tab3, tab4 = st.tabs(["📊 Stock Actual", "🔄 Ventas/Ingresos", "📜 Historial", "🛠️ Catálogo"])
+tab1, tab2, tab3, tab4 = st.tabs(["📊 Stock Actual", "🔄 Ventas/Ingresos", "📜 Historial Movimientos", "🛠️ Catálogo"])
 
-# --- TAB 1: STOCK ACTUAL CON TOTALES ---
+# --- TAB 1: STOCK ACTUAL ---
 with tab1:
-    st.subheader("Estado del Almacén")
-    
-    # Creamos una copia para mostrar cálculos sin afectar la base original
+    st.subheader("Estado del Inventario")
     df_mostrar = st.session_state.df_stock.copy()
     df_mostrar['Total_Costo ($)'] = df_mostrar['Cantidad'] * df_mostrar['Costo']
     
@@ -40,82 +39,88 @@ with tab1:
     
     total_general = df_mostrar['Total_Costo ($)'].sum()
     st.divider()
-    st.metric("VALOR TOTAL DEL STOCK (Costo)", f"${total_general:,.2f}")
+    st.metric("CAPITAL TOTAL EN STOCK", f"${total_general:,.2f}")
 
-# --- TAB 2: REGISTRAR MOVIMIENTO ---
+# --- TAB 2: REGISTRAR MOVIMIENTO (VENTA O COMPRA) ---
 with tab2:
     st.subheader("Registrar Movimiento")
     with st.container(border=True):
-        p_mov = st.selectbox("Producto:", st.session_state.df_stock['Producto'], key="mov_p")
-        tipo = st.radio("Operación:", ["Venta (-)", "Compra (+)"], horizontal=True)
-        cant_mov = st.number_input("Cantidad:", min_value=0.0, step=0.1)
+        p_mov = st.selectbox("Seleccioná el Producto:", st.session_state.df_stock['Producto'], key="sel_prod_mov")
+        tipo = st.radio("Tipo de Operación:", ["Venta (-)", "Compra (+)"], horizontal=True)
+        cant_mov = st.number_input("Cantidad a mover:", min_value=0.0, step=0.1)
         
-        if st.button("Confirmar y Actualizar"):
-            idx = st.session_state.df_stock.index[st.session_state.df_stock['Producto'] == p_mov][0]
-            medida = st.session_state.df_stock.at[idx, 'Medida']
-            
-            # Actualizar Stock
-            if tipo == "Venta (-)":
-                st.session_state.df_stock.at[idx, 'Cantidad'] -= cant_mov
+        if st.button("Ejecutar Movimiento"):
+            if cant_mov > 0:
+                idx = st.session_state.df_stock.index[st.session_state.df_stock['Producto'] == p_mov][0]
+                
+                # Actualizar el stock
+                if tipo == "Venta (-)":
+                    st.session_state.df_stock.at[idx, 'Cantidad'] -= cant_mov
+                else:
+                    st.session_state.df_stock.at[idx, 'Cantidad'] += cant_mov
+                
+                # CREAR REGISTRO PARA EL HISTORIAL
+                nuevo_registro = {
+                    'Fecha': datetime.now().strftime("%d/%m/%Y %H:%M:%S"),
+                    'Producto': p_mov,
+                    'Operación': "Venta" if "Venta" in tipo else "Compra",
+                    'Cantidad': cant_mov,
+                    'Medida': st.session_state.df_stock.at[idx, 'Medida']
+                }
+                
+                # Insertar al principio de la lista
+                st.session_state.historial_datos.insert(0, nuevo_registro)
+                
+                st.success(f"¡Éxito! Se registró la {tipo} de {cant_mov} en {p_mov}")
+                st.rerun()
             else:
-                st.session_state.df_stock.at[idx, 'Cantidad'] += cant_mov
-            
-            # Guardar en Historial
-            nuevo_historial = {
-                'Fecha': datetime.now().strftime("%d/%m/%Y %H:%M"),
-                'Producto': p_mov,
-                'Tipo': "Venta" if tipo == "Venta (-)" else "Compra",
-                'Cantidad': cant_mov,
-                'Medida': medida
-            }
-            st.session_state.historial = pd.concat([pd.DataFrame([nuevo_historial]), st.session_state.historial], ignore_index=True)
-            
-            st.success(f"Movimiento registrado: {p_mov}")
-            st.rerun()
+                st.warning("La cantidad debe ser mayor a 0.")
 
 # --- TAB 3: HISTORIAL DE MOVIMIENTOS ---
 with tab3:
-    st.subheader("Registro Histórico")
-    if st.session_state.historial.empty:
-        st.info("Todavía no hay movimientos registrados.")
+    st.subheader("Historial de Actividad")
+    if len(st.session_state.historial_datos) == 0:
+        st.info("Aún no se han realizado ventas o compras en esta sesión.")
     else:
-        st.dataframe(st.session_state.historial, use_container_width=True)
-        if st.button("Limpiar Historial"):
-            st.session_state.historial = pd.DataFrame(columns=['Fecha', 'Producto', 'Tipo', 'Cantidad', 'Medida'])
+        # Convertimos la lista de registros a un DataFrame para mostrarlo
+        df_hist = pd.DataFrame(st.session_state.historial_datos)
+        st.table(df_hist) # Usamos table para asegurar que se vea bien en móvil
+        
+        if st.button("Borrar Historial"):
+            st.session_state.historial_datos = []
             st.rerun()
 
 # --- TAB 4: GESTIÓN DE CATÁLOGO ---
 with tab4:
-    st.subheader("Administrar Catálogo")
-    accion = st.radio("Acción:", ["Agregar Nuevo", "Modificar Existente", "Eliminar"], horizontal=True)
+    st.subheader("Administración de Productos")
+    accion = st.radio("Acción:", ["Agregar", "Modificar", "Eliminar"], horizontal=True)
 
-    if accion == "Agregar Nuevo":
-        with st.form("nuevo_form"):
-            n_nom = st.text_input("Nombre del Producto")
-            c1, c2, c3 = st.columns(3)
-            with c1: n_med = st.selectbox("Medida", ["Kgs", "Unidades"])
-            with c2: n_cos = st.number_input("Costo", min_value=0.0)
-            with c3: n_ven = st.number_input("Venta", min_value=0.0)
-            if st.form_submit_button("Guardar"):
+    if accion == "Agregar":
+        with st.form("add_form"):
+            n_nom = st.text_input("Nombre")
+            n_med = st.selectbox("Medida", ["Kgs", "Unidades"])
+            n_cos = st.number_input("Costo", min_value=0.0)
+            n_ven = st.number_input("Venta", min_value=0.0)
+            if st.form_submit_button("Añadir Producto"):
                 nuevo = {'Producto': n_nom, 'Cantidad': 0.0, 'Medida': n_med, 'Costo': n_cos, 'Precio_Venta': n_ven}
                 st.session_state.df_stock = pd.concat([st.session_state.df_stock, pd.DataFrame([nuevo])], ignore_index=True)
                 st.rerun()
 
-    elif accion == "Modificar Existente":
-        prod_a_editar = st.selectbox("Producto a editar:", st.session_state.df_stock['Producto'])
-        idx_ed = st.session_state.df_stock.index[st.session_state.df_stock['Producto'] == prod_a_editar][0]
+    elif accion == "Modificar":
+        prod_ed = st.selectbox("Producto:", st.session_state.df_stock['Producto'])
+        idx_e = st.session_state.df_stock.index[st.session_state.df_stock['Producto'] == prod_ed][0]
         with st.form("edit_form"):
-            e_nom = st.text_input("Nombre", value=st.session_state.df_stock.at[idx_ed, 'Producto'])
-            e_cos = st.number_input("Costo", value=float(st.session_state.df_stock.at[idx_ed, 'Costo']))
-            e_ven = st.number_input("Venta", value=float(st.session_state.df_stock.at[idx_ed, 'Precio_Venta']))
-            if st.form_submit_button("Actualizar"):
-                st.session_state.df_stock.at[idx_ed, 'Producto'] = e_nom
-                st.session_state.df_stock.at[idx_ed, 'Costo'] = e_cos
-                st.session_state.df_stock.at[idx_ed, 'Precio_Venta'] = e_ven
+            e_nom = st.text_input("Nuevo Nombre", value=st.session_state.df_stock.at[idx_e, 'Producto'])
+            e_cos = st.number_input("Nuevo Costo", value=float(st.session_state.df_stock.at[idx_e, 'Costo']))
+            e_ven = st.number_input("Nueva Venta", value=float(st.session_state.df_stock.at[idx_e, 'Precio_Venta']))
+            if st.form_submit_button("Actualizar Datos"):
+                st.session_state.df_stock.at[idx_e, 'Producto'] = e_nom
+                st.session_state.df_stock.at[idx_e, 'Costo'] = e_cos
+                st.session_state.df_stock.at[idx_e, 'Precio_Venta'] = e_ven
                 st.rerun()
 
     elif accion == "Eliminar":
-        prod_del = st.selectbox("Producto a eliminar:", st.session_state.df_stock['Producto'])
-        if st.button("Eliminar", type="primary"):
+        prod_del = st.selectbox("Eliminar:", st.session_state.df_stock['Producto'])
+        if st.button("Eliminar permanentemente", type="primary"):
             st.session_state.df_stock = st.session_state.df_stock[st.session_state.df_stock['Producto'] != prod_del]
             st.rerun()
