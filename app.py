@@ -87,4 +87,35 @@ with tab3:
 # --- TAB 4: GESTIÓN DE CATÁLOGO ---
 with tab4:
     st.subheader("Administrar Catálogo")
-    accion = st.radio("Acción:", ["Agregar Nuevo", "Modificar Existente", "Eliminar"], horizontal
+    accion = st.radio("Acción:", ["Agregar Nuevo", "Modificar Existente", "Eliminar"], horizontal=True)
+
+    if accion == "Agregar Nuevo":
+        with st.form("nuevo_form"):
+            n_nom = st.text_input("Nombre del Producto")
+            c1, c2, c3 = st.columns(3)
+            with c1: n_med = st.selectbox("Medida", ["Kgs", "Unidades"])
+            with c2: n_cos = st.number_input("Costo", min_value=0.0)
+            with c3: n_ven = st.number_input("Venta", min_value=0.0)
+            if st.form_submit_button("Guardar"):
+                nuevo = {'Producto': n_nom, 'Cantidad': 0.0, 'Medida': n_med, 'Costo': n_cos, 'Precio_Venta': n_ven}
+                st.session_state.df_stock = pd.concat([st.session_state.df_stock, pd.DataFrame([nuevo])], ignore_index=True)
+                st.rerun()
+
+    elif accion == "Modificar Existente":
+        prod_a_editar = st.selectbox("Producto a editar:", st.session_state.df_stock['Producto'])
+        idx_ed = st.session_state.df_stock.index[st.session_state.df_stock['Producto'] == prod_a_editar][0]
+        with st.form("edit_form"):
+            e_nom = st.text_input("Nombre", value=st.session_state.df_stock.at[idx_ed, 'Producto'])
+            e_cos = st.number_input("Costo", value=float(st.session_state.df_stock.at[idx_ed, 'Costo']))
+            e_ven = st.number_input("Venta", value=float(st.session_state.df_stock.at[idx_ed, 'Precio_Venta']))
+            if st.form_submit_button("Actualizar"):
+                st.session_state.df_stock.at[idx_ed, 'Producto'] = e_nom
+                st.session_state.df_stock.at[idx_ed, 'Costo'] = e_cos
+                st.session_state.df_stock.at[idx_ed, 'Precio_Venta'] = e_ven
+                st.rerun()
+
+    elif accion == "Eliminar":
+        prod_del = st.selectbox("Producto a eliminar:", st.session_state.df_stock['Producto'])
+        if st.button("Eliminar", type="primary"):
+            st.session_state.df_stock = st.session_state.df_stock[st.session_state.df_stock['Producto'] != prod_del]
+            st.rerun()
