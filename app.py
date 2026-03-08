@@ -77,4 +77,21 @@ with tab3:
                 e_nom = st.text_input("Nombre", value=st.session_state.df_stock.at[idx_ed, 'Producto'])
                 e_med = st.selectbox("Medida", ["Kgs", "Unidades"], index=0 if st.session_state.df_stock.at[idx_ed, 'Medida'] == 'Kgs' else 1)
             with col2:
-                e_cos = st.number_input("
+                e_cos = st.number_input("Costo", value=float(st.session_state.df_stock.at[idx_ed, 'Costo']))
+                e_ven = st.number_input("Venta", value=float(st.session_state.df_stock.at[idx_ed, 'Precio_Venta']))
+            
+            if st.form_submit_button("Guardar Cambios"):
+                st.session_state.df_stock.at[idx_ed, 'Producto'] = e_nom
+                st.session_state.df_stock.at[idx_ed, 'Medida'] = e_med
+                st.session_state.df_stock.at[idx_ed, 'Costo'] = e_cos
+                st.session_state.df_stock.at[idx_ed, 'Precio_Venta'] = e_ven
+                st.success("Cambios guardados.")
+                st.rerun()
+
+    # --- ELIMINAR ---
+    elif accion == "Eliminar":
+        prod_del = st.selectbox("Producto a eliminar:", st.session_state.df_stock['Producto'], key="del_sel")
+        if st.button("Confirmar Eliminación", type="primary"):
+            st.session_state.df_stock = st.session_state.df_stock[st.session_state.df_stock['Producto'] != prod_del]
+            st.warning(f"Se eliminó {prod_del}")
+            st.rerun()
