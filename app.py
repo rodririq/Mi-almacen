@@ -4,79 +4,77 @@ import pandas as pd
 st.set_page_config(page_title="Almacén Saludable Pro", layout="wide")
 st.title("🌿 Gestión de Almacén Saludable")
 
-# 1. Inicialización de la base de datos en la sesión
+# 1. Inicialización de la base de datos (Memoria temporal)
 if 'df_stock' not in st.session_state:
     data = {
         'Producto': ['Nueces Mariposa', 'Harina de Almendras', 'Chía', 'Aceite de Coco'],
         'Cantidad': [15.0, 3.0, 20.0, 8.0],
         'Medida': ['Kgs', 'Kgs', 'Kgs', 'Unidades'],
-        'Costo': [0.0, 0.0, 0.0, 0.0],
-        'Precio_Venta': [0.0, 0.0, 0.0, 0.0]
+        'Costo': [1200.0, 4500.0, 800.0, 3200.0],
+        'Precio_Venta': [1800.0, 6500.0, 1500.0, 4800.0]
     }
     st.session_state.df_stock = pd.DataFrame(data)
 
-# --- Pestañas para organizar la App ---
-tab1, tab2, tab3 = st.tabs(["📊 Inventario", "🔄 Movimientos", "⚙️ Configuración Productos"])
+# --- Pestañas de la App ---
+tab1, tab2, tab3 = st.tabs(["📊 Stock Actual", "🔄 Ventas/Ingresos", "🛠️ Catálogo de Productos"])
 
+# --- TAB 1: INVENTARIO ---
 with tab1:
-    st.subheader("Estado Actual del Stock")
-    # Mostramos la tabla. Usamos format para que los kilos tengan decimales y unidades no.
-    st.dataframe(st.session_state.df_stock, use_container_width=True)
-    
-    total_valor_stock = (st.session_state.df_stock['Cantidad'] * st.session_state.df_stock['Costo']).sum()
-    st.metric("Inversión Total en Stock", f"${total_valor_stock:,.2f}")
+    st.subheader("Estado del Almacén")
+    # Formateamos la tabla para que se vea pro
+    st.dataframe(st.session_state.df_stock.style.format({
+        'Costo': '${:,.2f}',
+        'Precio_Venta': '${:,.2f}',
+        'Cantidad': '{:,.2f}'
+    }), use_container_width=True)
 
+# --- TAB 2: MOVIMIENTOS ---
 with tab2:
-    st.subheader("Registrar Venta o Ingreso")
-    col_a, col_b, col_c = st.columns(3)
-    
-    with col_a:
-        prod_sel = st.selectbox("Seleccioná Producto:", st.session_state.df_stock['Producto'])
-        # Buscamos la medida del producto seleccionado
-        medida_sel = st.session_state.df_stock.loc[st.session_state.df_stock['Producto'] == prod_sel, 'Medida'].values[0]
-    
-    with col_b:
-        paso = 0.1 if medida_sel == 'Kgs' else 1.0
-        cant_mov = st.number_input(f"Cantidad ({medida_sel}):", min_value=0.0, step=paso)
-    
-    with col_c:
-        tipo_mov = st.radio("Acción:", ["Venta (-)", "Compra (+)"])
-
-    if st.button("Confirmar Movimiento"):
-        idx = st.session_state.df_stock.index[st.session_state.df_stock['Producto'] == prod_sel][0]
-        if tipo_mov == "Venta (-)":
-            st.session_state.df_stock.at[idx, 'Cantidad'] -= cant_mov
-        else:
-            st.session_state.df_stock.at[idx, 'Cantidad'] += cant_mov
-        st.success("¡Stock actualizado!")
-        st.rerun()
-
-with tab3:
-    st.subheader("Agregar Nuevo Producto")
+    st.subheader("Registrar Movimiento")
     with st.container(border=True):
-        n_nombre = st.text_input("Nombre del producto:")
-        c1, c2, c3 = st.columns(3)
-        with c1:
-            n_medida = st.selectbox("Tipo de Medida:", ["Unidades", "Kgs"])
-        with c2:
-            n_costo = st.number_input("Costo inicial:", min_value=0.0)
-        with c3:
-            n_venta = st.number_input("Precio venta:", min_value=0.0)
+        p_mov = st.selectbox("Producto:", st.session_state.df_stock['Producto'], key="mov_p")
+        tipo = st.radio("Operación:", ["Venta (-)", "Compra (+)"], horizontal=True)
+        cant_mov = st.number_input("Cantidad:", min_value=0.0, step=0.1)
         
-        if st.button("➕ Añadir al Almacén"):
-            if n_nombre:
-                nuevo_item = {
-                    'Producto': n_nombre, 'Cantidad': 0.0, 'Medida': n_medida,
-                    'Costo': n_costo, 'Precio_Venta': n_venta
-                }
-                st.session_state.df_stock = pd.concat([st.session_state.df_stock, pd.DataFrame([nuevo_item])], ignore_index=True)
-                st.success(f"{n_nombre} agregado.")
+        if st.button("Confirmar y Actualizar"):
+            idx = st.session_state.df_stock.index[st.session_state.df_stock['Producto'] == p_mov][0]
+            if tipo == "Venta (-)":
+                st.session_state.df_stock.at[idx, 'Cantidad'] -= cant_mov
+            else:
+                st.session_state.df_stock.at[idx, 'Cantidad'] += cant_mov
+            st.success("Stock actualizado con éxito.")
+            st.rerun()
+
+# --- TAB 3: GESTIÓN COMPLETA (CRUD) ---
+with tab3:
+    st.subheader("Administrar Productos")
+    
+    accion = st.segmented_control("¿Qué querés hacer?", ["Agregar Nuevo", "Modificar Existente", "Eliminar"], default="Agregar Nuevo")
+
+    # --- AGREGAR ---
+    if accion == "Agregar Nuevo":
+        with st.form("nuevo_form"):
+            n_nom = st.text_input("Nombre del Producto")
+            c1, c2, c3 = st.columns(3)
+            with c1: n_med = st.selectbox("Medida", ["Kgs", "Unidades"])
+            with c2: n_cos = st.number_input("Costo", min_value=0.0)
+            with c3: n_ven = st.number_input("Venta", min_value=0.0)
+            
+            if st.form_submit_button("Guardar Producto"):
+                nuevo = {'Producto': n_nom, 'Cantidad': 0.0, 'Medida': n_med, 'Costo': n_cos, 'Precio_Venta': n_ven}
+                st.session_state.df_stock = pd.concat([st.session_state.df_stock, pd.DataFrame([nuevo])], ignore_index=True)
+                st.success("Producto agregado al catálogo.")
                 st.rerun()
 
-    st.divider()
-    st.subheader("Eliminar Producto")
-    prod_eliminar = st.selectbox("Seleccioná qué eliminar:", st.session_state.df_stock['Producto'], key="del")
-    if st.button("🗑️ Borrar definitivamente", type="primary"):
-        st.session_state.df_stock = st.session_state.df_stock[st.session_state.df_stock['Producto'] != prod_eliminar]
-        st.warning(f"Se eliminó {prod_eliminar}")
-        st.rerun()
+    # --- MODIFICAR ---
+    elif accion == "Modificar Existente":
+        prod_a_editar = st.selectbox("Seleccioná el producto a editar:", st.session_state.df_stock['Producto'])
+        idx_ed = st.session_state.df_stock.index[st.session_state.df_stock['Producto'] == prod_a_editar][0]
+        
+        with st.form("edit_form"):
+            col1, col2 = st.columns(2)
+            with col1:
+                e_nom = st.text_input("Nombre", value=st.session_state.df_stock.at[idx_ed, 'Producto'])
+                e_med = st.selectbox("Medida", ["Kgs", "Unidades"], index=0 if st.session_state.df_stock.at[idx_ed, 'Medida'] == 'Kgs' else 1)
+            with col2:
+                e_cos = st.number_input("
