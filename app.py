@@ -28,7 +28,16 @@ def cargar_historial():
         return pd.DataFrame(columns=['Fecha', 'Producto', 'Operación', 'Cantidad', 'Medida'])
 
 # Carga inicial
-df_stock = cargar_datos()
+def cargar_datos():
+    try:
+        # Intentamos leer la planilla usando la URL directamente por si los secrets fallan
+        url = "https://docs.google.com/spreadsheets/d/1e6AEQsI-dwA7_ek_vusM6YcWJB6tBrXhhwW-ZXVT__k/edit#gid=0"
+        df = conn.read(spreadsheet=url, worksheet="Productos", ttl=0)
+        return df.dropna(how="all")
+    except Exception as e:
+        st.error(f"Fallo de conexión. Intentando modo alternativo... Error: {e}")
+        # Retorno de emergencia para que la app no se rompa
+        return pd.DataFrame(columns=['Producto', 'Cantidad', 'Medida', 'Costo', 'Precio_Venta'])
 
 # --- INTERFAZ ---
 tab1, tab2, tab3, tab4 = st.tabs(["📊 Stock Actual", "🔄 Ventas/Ingresos", "📜 Historial", "🛠️ Catálogo"])
